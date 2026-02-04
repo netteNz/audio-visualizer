@@ -163,19 +163,20 @@ with dpg.window(tag="Primary Window"):
             tag="fft_series\"
         )
 
-# Custom styling for waveform line - CYAN
-with dpg.theme() as wave_theme:
-    with dpg.theme_component(dpg.mvLineSeries):
-        dpg.add_theme_color(dpg.mvPlotCol_Line, (0, 217, 255, 255))
-        dpg.add_theme_style(dpg.mvPlotStyleVar_LineWeight, 2.0)
+# Create themes for custom line colors
+# Waveform theme - CYAN
+wave_theme = dpg.add_theme()
+with dpg.theme_component(dpg.mvLineSeries, parent=wave_theme):
+    dpg.add_theme_color(dpg.mvPlotCol_Line, (0, 217, 255, 255))
+    dpg.add_theme_style(dpg.mvPlotStyleVar_LineWeight, 2.0)
 
 dpg.bind_item_theme("wave_series", wave_theme)
 
-# Create FFT theme - PURPLE
-with dpg.theme() as fft_theme:
-    with dpg.theme_component(dpg.mvLineSeries):
-        dpg.add_theme_color(dpg.mvPlotCol_Line, (200, 60, 255, 255))
-        dpg.add_theme_style(dpg.mvPlotStyleVar_LineWeight, 2.5)
+# FFT theme - PURPLE  
+fft_theme = dpg.add_theme()
+with dpg.theme_component(dpg.mvLineSeries, parent=fft_theme):
+    dpg.add_theme_color(dpg.mvPlotCol_Line, (200, 60, 255, 255))
+    dpg.add_theme_style(dpg.mvPlotStyleVar_LineWeight, 2.5)
 
 dpg.bind_item_theme("fft_series", fft_theme)
 
