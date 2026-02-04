@@ -1,12 +1,23 @@
 import platform
+import sys
 
 # Detect OS
-CURRENT_OS = platform.system() # Returns 'Windows' or 'Darwin' (macOS)
+CURRENT_OS = platform.system()  # Returns 'Windows' or 'Darwin' (macOS)
 
-def get_input_device():
+def main():
+    """Launch platform-specific audio visualizer"""
+    print(f"Detected OS: {CURRENT_OS}")
+    
     if CURRENT_OS == 'Windows':
-        # Auto-find Windows Loopback
-        return sc.default_speaker().name 
+        print("Starting Windows audio visualizer (Loopback mode)...")
+        import windows
     elif CURRENT_OS == 'Darwin':
-        # Hardcode BlackHole for Mac dev
-        return "BlackHole 2ch"
+        print("Starting macOS audio visualizer...")
+        import mac
+    else:
+        print(f"Unsupported OS: {CURRENT_OS}")
+        print("This application supports Windows and macOS only.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

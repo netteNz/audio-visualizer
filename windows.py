@@ -43,14 +43,47 @@ def amplitude_to_color(amplitude_db):
 def audio_thread_func():
     global fft_data
     
-    # Auto-detect default mic
+    # Windows: Use loopback to capture desktop audio (what's playing)
     try:
-        mic = sc.default_microphone()
-        print(f"Audio Thread: Listening to '{mic.name}'")
-    except:
+        # Get the default speaker to know which device we should capture from
+        default_speaker = sc.default_speaker()
+        print(f"Default speaker: {default_speaker.name}")
+        
+        # Get all microphones including loopback devices
+        mics = sc.all_microphones(include_loopback=True)
+        
+        # Find the loopback device that matches the default speaker
+        # Loopback devices usually have the same base name as the speaker
+        loopback = None
+        for mic in mics:
+            if mic.isloopback:
+                # Try to match the loopback to the default speaker by name
+                # Windows loopback typically has similar naming to the speaker
+                if default_speaker.name in mic.name or mic.name in default_speaker.name:
+                    loopback = mic
+                    break
+        
+        # If we couldn't find a matching loopback, just use the first loopback device
+        if loopback is None:
+            for mic in mics:
+                if mic.isloopback:
+                    loopback = mic
+                    break
+        
+        if loopback is None:
+            print("No loopback device found. Available devices:")
+            for mic in mics:
+                print(f"  - {mic.name} (loopback: {mic.isloopback})")
+            return
+            
+        print(f"Audio Thread: Listening to loopback from '{loopback.name}'")
+    except Exception as e:
+        print(f"Error accessing loopback audio: {e}")
+        import traceback
+        traceback.print_exc()
         return
 
-    with mic.recorder(samplerate=SAMPLE_RATE) as recorder:
+    with loopback.recorder(samplerate=SAMPLE_RATE) as recorder:
         while stream_running:
             # 1. Capture Data
             raw_buffer = recorder.record(numframes=BUFFER_SIZE)
@@ -82,51 +115,13 @@ def audio_thread_func():
                 # Update the shared variable
                 fft_data = spectrum_db
 
-# --- SETUP CUSTOM THEME ---
-def setup_theme():
-    with dpg.theme() as global_theme:
-        with dpg.theme_component(dpg.mvAll):
-            # Background colors
-            dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (20, 20, 28, 255))
-            dpg.add_theme_color(dpg.mvThemeCol_ChildBg, (25, 25, 35, 255))
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (30, 30, 40, 255))
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgHovered, (40, 40, 50, 255))
-            dpg.add_theme_color(dpg.mvThemeCol_FrameBgActive, (50, 50, 60, 255))
-            
-            # Text
-            dpg.add_theme_color(dpg.mvThemeCol_Text, (220, 220, 220, 255))
-            dpg.add_theme_color(dpg.mvThemeCol_TextDisabled, (128, 128, 128, 255))
-            
-            # Borders and lines
-            dpg.add_theme_color(dpg.mvThemeCol_Border, (60, 60, 70, 128))
-            dpg.add_theme_color(dpg.mvThemeCol_BorderShadow, (0, 0, 0, 0))
-            
-            # Title bar
-            dpg.add_theme_color(dpg.mvThemeCol_TitleBg, (15, 15, 20, 255))
-            dpg.add_theme_color(dpg.mvThemeCol_TitleBgActive, (20, 20, 30, 255))
-            dpg.add_theme_color(dpg.mvThemeCol_TitleBgCollapsed, (15, 15, 20, 255))
-            
-            # Plot backgrounds (but NOT line colors - those are set per-series)
-            dpg.add_theme_color(dpg.mvPlotCol_FrameBg, (25, 25, 35, 255))
-            dpg.add_theme_color(dpg.mvPlotCol_PlotBg, (18, 18, 25, 255))
-            
-            # Spacing and rounding
-            dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 4)
-            dpg.add_theme_style(dpg.mvStyleVar_WindowRounding, 6)
-            dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 4)
-            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 8, 6)
-            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 8)
-            dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 15, 15)
-    
-    dpg.bind_theme(global_theme)
-
 # --- GUI SETUP ---
 dpg.create_context()
 
 with dpg.window(tag="Primary Window"):
     # Title section
     dpg.add_text("AUDIO VISUALIZER", color=(0, 217, 255, 255))
-    dpg.add_text("Microphone Input Analysis", color=(150, 150, 150, 255))
+    dpg.add_text("Desktop Audio Analysis", color=(150, 150, 150, 255))
     dpg.add_spacer(height=10)
     
     # PLOT 1: OSCILLOSCOPE
@@ -151,7 +146,7 @@ with dpg.window(tag="Primary Window"):
     with dpg.plot(label="Spectrum - Frequency Domain (FFT)", height=280, width=-1):
         dpg.add_plot_legend(location=dpg.mvPlot_Location_NorthEast)
         dpg.add_plot_axis(dpg.mvXAxis, label="Frequency Bin", no_tick_labels=True, tag="x_axis_fft")
-        dpg.add_plot_axis(dpg.mvYAxis, label="Magnitude (dB)\", tag="y_axis_fft")
+        dpg.add_plot_axis(dpg.mvYAxis, label="Magnitude (dB)", tag="y_axis_fft")
         dpg.set_axis_limits("y_axis_fft", -100, 0)
         
         # Use line series with vibrant purple for spectrogram-inspired look
@@ -160,7 +155,7 @@ with dpg.window(tag="Primary Window"):
             list(fft_data),
             label="Spectrum",
             parent="y_axis_fft",
-            tag="fft_series\"
+            tag="fft_series"
         )
 
 # Custom styling for waveform line - CYAN
@@ -178,9 +173,6 @@ with dpg.theme() as fft_theme:
         dpg.add_theme_style(dpg.mvPlotStyleVar_LineWeight, 2.5)
 
 dpg.bind_item_theme("fft_series", fft_theme)
-
-# Apply the global theme AFTER series themes are bound
-setup_theme()
 
 dpg.create_viewport(title='Audio Visualizer', width=1000, height=660)
 dpg.setup_dearpygui()
